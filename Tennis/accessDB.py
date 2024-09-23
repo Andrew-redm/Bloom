@@ -1,9 +1,47 @@
 import os
 import pyodbc
 import numpy as np
+import pandas as pd
 
 db_path = os.environ.get('ONCOURT_DB_PATH')
 db_password = os.environ.get('ONCOURT_DB_PASSWORD')
+
+def change_column_names(df, replacements):
+    df = df.rename(columns=replacements)
+    return df
+
+def get_top_100():
+    top100WTA = '''
+                SELECT TOP 100 ratings_wta.ID_P_R, players_wta.NAME_P, ratings_wta.POS_R, ratings_wta.DATE_R
+                FROM ratings_wta
+                INNER JOIN players_wta ON ratings_wta.ID_P_R = players_wta.ID_P
+                WHERE ratings_wta.POS_R < 101 AND ratings_wta.DATE_R = (SELECT MAX(DATE_R) FROM ratings_wta)
+                ORDER BY ratings_wta.POS_R ASC'''
+    top_100 = change_column_names(pd.read_sql(top100WTA, conn), replacements)
+    return top_100
+
+def get_player_match_odds(player_name):
+    #this should really take a player pair and tournament id to return price for one match only
+    query = f'''
+    SELECT odds_wta.*, players_wta.NAME_P
+    FROM odds_wta
+    INNER JOIN players_wta ON (odds_wta.ID1_O = players_wta.ID_P OR odds_wta.ID2_O = players_wta.ID_P)
+    WHERE players_wta.NAME_P = '{player_name}'
+    '''
+    df = pd.read_sql(query, conn)
+    df = change_column_names(df, replacements)
+    return df
+
+def get_player_match_result(player_name):
+    query = f'''
+    SELECT games_wta.*, tours_wta.NAME_T, tours_wta.ID_C_T
+    FROM games_wta
+    INNER JOIN tours_wta ON games_wta.ID_T_G = tours_wta.ID_T
+    WHERE ID1_G = (SELECT ID_P FROM players_wta WHERE NAME_P = '{player_name}') OR ID2_G = (SELECT ID_P FROM players_wta WHERE NAME_P = '{player_name}')
+    '''
+    df = pd.read_sql(query, conn)
+    df = change_column_names(df, replacements)
+    return df
 
 if not db_path or not db_password:
     raise ValueError("ONCOURT_DB_PATH or ONCOURT_DB_PASSWORD environment variable not set")
@@ -13,33 +51,11 @@ conn_str = r"DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=" + db_path +
 try:
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
-    query = "SELECT * FROM odds_wta WHERE ID1_O = (SELECT ID_P FROM players_wta WHERE NAME_P = 'Jelena Ostapenko') OR ID2_O = (SELECT ID_P FROM players_wta WHERE NAME_P = 'Jelena Ostapenko')"
-    top100WTA = '''
-                    SELECT TOP 100 ratings_wta.ID_P_R, players_wta.NAME_P, ratings_wta.POS_R, ratings_wta.DATE_R
-                    FROM ratings_wta
-                    INNER JOIN players_wta ON ratings_wta.ID_P_R = players_wta.ID_P
-                    WHERE ratings_wta.POS_R < 101 AND ratings_wta.DATE_R = (SELECT MAX(DATE_R) FROM ratings_wta)
-                    ORDER BY ratings_wta.POS_R ASC'''
-    result = cursor.execute(query)
+    
 except pyodbc.Error as e:
     print("Error connecting to the database:", e)
 
-
-#make pandas df of the result
-import pandas as pd
-df = pd.read_sql(query, conn)
-column_names = df.columns.to_list()
-column_names
-
-top_100 = pd.read_sql(top100WTA, conn)
-top_100.head()
-
-
-help(pyodbc)
-def change_column_names(df, replacements):
-    df = df.rename(columns=replacements)
-    return df
-
+#TODO - move this to a separate file
 replacements = {
     'ID1_O': 'Player 1 ID',
     'ID2_O': 'Player 2 ID',
@@ -134,44 +150,11 @@ replacements = {
     'RPWOF_1': 'receiving points won of'
 }
 
-df = change_column_names(df, replacements)
-df.head()
-df.isnull().sum()
-top_100 = change_column_names(top_100, replacements)
-top_100.head()
+# example usage
+# iga_odds = get_player_match_odds('Iga Swiatek')
+# iga_results = get_player_match_result('Iga Swiatek')
 
-def get_top_100():
-    return top_100
+# iga_combined = pd.merge(iga_results, iga_odds, right_on=['P1_ID', 'P2_ID', 'TOUR'], left_on=['ID Winner_G', 'ID Loser_G', 'Tour ID_G'], how='outer')
+# this needs work
 
-
-
-def get_player_match_odds(player_name):
-    query = f'''
-    SELECT odds_wta.*, players_wta.NAME_P
-    FROM odds_wta
-    INNER JOIN players_wta ON (odds_wta.ID1_O = players_wta.ID_P OR odds_wta.ID2_O = players_wta.ID_P)
-    WHERE players_wta.NAME_P = '{player_name}'
-    '''
-    df = pd.read_sql(query, conn)
-    df = change_column_names(df, replacements)
-    return df
-
-def get_player_match_result(player_name):
-    query = f'''
-    SELECT games_wta.*, tours_wta.NAME_T, tours_wta.ID_C_T
-    FROM games_wta
-    INNER JOIN tours_wta ON games_wta.ID_T_G = tours_wta.ID_T
-    WHERE ID1_G = (SELECT ID_P FROM players_wta WHERE NAME_P = '{player_name}') OR ID2_G = (SELECT ID_P FROM players_wta WHERE NAME_P = '{player_name}')
-    '''
-    df = pd.read_sql(query, conn)
-    df = change_column_names(df, replacements)
-    return df
-
-iga_odds = get_player_match_odds('Iga Swiatek')
-iga_results = get_player_match_result('Iga Swiatek')
-
-iga_odds.columns
-iga_results.columns
-iga_combined = pd.merge(iga_results, iga_odds, right_on=['P1_ID', 'P2_ID', 'TOUR'], left_on=['ID Winner_G', 'ID Loser_G', 'Tour ID_G'], how='outer')
-
-iga_combined.to_csv('iga_combined.csv', index=False)
+# query = "SELECT * FROM odds_wta WHERE ID1_O = (SELECT ID_P FROM players_wta WHERE NAME_P = 'Jelena Ostapenko') OR ID2_O = (SELECT ID_P FROM players_wta WHERE NAME_P = 'Jelena Ostapenko')"
