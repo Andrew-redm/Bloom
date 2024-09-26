@@ -50,6 +50,22 @@ def change_column_names(df, replacements):
     df = df.rename(columns=replacements)
     return df
 
+def get_matches_in_daterange(start_date, end_date=None, singlesOnly=True):
+    if end_date is None:
+        end_date = datetime.now() - timedelta(days=1)
+    query = f'''
+    SELECT *
+    FROM games_wta
+    WHERE DATE_G BETWEEN #{start_date}# AND #{end_date.strftime('%Y-%m-%d')}#
+    '''
+    matches = pd.read_sql(query, conn)
+    matches = change_column_names(matches, replacements)
+    matches['winnerName'] = matches['ID Winner_G'].apply(player_id_to_name)
+    matches['loserName'] = matches['ID Loser_G'].apply(player_id_to_name)
+    if singlesOnly:
+        matches = matches[~matches['winnerName'].str.contains('/') & ~matches['loserName'].str.contains('/')]
+    return matches
+
 def get_tournaments_in_daterange(start_date, end_date=None):
     """
     Retrieves tournaments within a specified date range from the 'tours_wta' table.
