@@ -61,7 +61,9 @@ def main(start_date: str, end_date: str):
         elo.add_player(winner_id, winner_name)
         elo.add_player(loser_id, loser_name)
     
-        match = Match(winner=winner_id, loser=loser_id, date=match['DATE_G'])
+        winner = elo.get_player(winner_id)
+        loser = elo.get_player(loser_id)
+        match = Match(winner=winner, loser=loser, date=match['Date_G'])
         elo.update_elo(match)
 
     for player in elo.players.values():
@@ -69,7 +71,5 @@ def main(start_date: str, end_date: str):
 
 if __name__ == "__main__":
     start_date = '2023-01-01'
-    end_date = '2023-12-31'
+    end_date = '2024-06-30'
     main(start_date, end_date)
-
-

@@ -61,7 +61,7 @@ def get_tournaments_in_daterange(start_date, end_date=None):
     tournaments = change_column_names(tournaments, replacements)
     return tournaments
 
-def get_matches_in_tournament(tournament_ids):
+def get_matches_in_tournament(tournament_ids, singlesOnly=True):
     """
     Retrieves matches from the 'games_wta' table for the given list of tournament IDs.
 
@@ -79,6 +79,8 @@ def get_matches_in_tournament(tournament_ids):
     matches = change_column_names(matches, replacements)
     matches['winnerName'] = matches['ID Winner_G'].apply(player_id_to_name)
     matches['loserName'] = matches['ID Loser_G'].apply(player_id_to_name)
+    if singlesOnly:
+        matches = matches[~matches['winnerName'].str.contains('/') & ~matches['loserName'].str.contains('/')]
     return matches
 
 def get_match_stats(id1, id2, tournament_id):
