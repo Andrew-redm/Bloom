@@ -19,7 +19,6 @@ def load_replacements(file_path):
 
 replacements = load_replacements('replacements.csv')
 
-
 def player_id_to_name(player_id):
     query = f'''
     SELECT NAME_P
@@ -28,6 +27,15 @@ def player_id_to_name(player_id):
     '''
     df = pd.read_sql(query, conn)
     return df['NAME_P'][0] if not df.empty else None
+
+def player_name_to_id(player_name):
+    query = f'''
+    SELECT ID_P
+    FROM players_wta
+    WHERE NAME_P = '{player_name}'
+    '''
+    df = pd.read_sql(query, conn)
+    return df['ID_P'][0] if not df.empty else None
 
 def tournament_id_to_name(tournament_id):
     query = f'''
@@ -116,6 +124,15 @@ def get_player_match_odds(player_name):
     prices = change_column_names(prices, replacements)
     return prices
 
+def get_todays_matches():
+    query = '''
+    SELECT *
+    FROM today_wta
+    WHERE today_wta.DATE_GAME >= NOW()
+    '''
+    today = pd.read_sql(query, conn)
+    return today
+
 def get_player_match_result(player_name):
     query = f'''
     SELECT games_wta.*, tours_wta.NAME_T, tours_wta.ID_C_T
@@ -138,12 +155,3 @@ try:
     
 except pyodbc.Error as e:
     print("Error connecting to the database:", e)
-
-def get_todays_matches():
-    query = '''
-    SELECT *
-    FROM today_wta
-    WHERE today_wta.DATE_GAME >= NOW()
-    '''
-    today = pd.read_sql(query, conn)
-    return today
