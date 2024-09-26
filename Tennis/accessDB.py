@@ -120,11 +120,11 @@ def get_match_stats(id1, id2, tournament_id):
 
 def get_top_100():
     top100WTA = '''
-                SELECT TOP 100 ratings_wta.ID_P_R, players_wta.NAME_P, ratings_wta.POS_R, ratings_wta.DATE_R
-                FROM ratings_wta
-                INNER JOIN players_wta ON ratings_wta.ID_P_R = players_wta.ID_P
-                WHERE ratings_wta.POS_R < 101 AND ratings_wta.DATE_R = (SELECT MAX(DATE_R) FROM ratings_wta)
-                ORDER BY ratings_wta.POS_R ASC'''
+    SELECT TOP 100 ratings_wta.ID_P_R, players_wta.NAME_P, ratings_wta.POS_R, ratings_wta.DATE_R
+    FROM ratings_wta
+    INNER JOIN players_wta ON ratings_wta.ID_P_R = players_wta.ID_P
+    WHERE ratings_wta.POS_R < 101 AND ratings_wta.DATE_R = (SELECT MAX(DATE_R) FROM ratings_wta)
+    ORDER BY ratings_wta.POS_R ASC'''
     top_100 = change_column_names(pd.read_sql(top100WTA, conn), replacements)
     return top_100
 
