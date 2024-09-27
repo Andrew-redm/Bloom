@@ -91,23 +91,29 @@ def load_data(start_date: str, end_date: str):
         match = Match(winner=winner, loser=loser, date=match['Date_G'])
         elo.update_elo(match)
 
-def plot_elo_history(player_name: str):
-    player_id = player_name_to_id(player_name)
-    player = elo.get_player(player_id)
-
-    if not player:
-        raise ValueError(f"Player {player_name} not found in the ELO system.")
-
-    dates = list(player.elo_history.keys())
-    elos = list(player.elo_history.values())
-
+def plot_elo_history(player_names: List[str]):
     plt.figure(figsize=(10, 5))
-    plt.plot(dates, elos, marker='o', linestyle='-', color='b')
-    plt.title(f'ELO Rating History for {player_name}')
+
+    for player_name in player_names:
+        player_id = player_name_to_id(player_name)
+        player = elo.get_player(player_id)
+
+        if not player:
+            raise ValueError(f"Player {player_name} not found in the ELO system.")
+
+        dates = list(player.elo_history.keys())
+        elos = list(player.elo_history.values())
+
+        plt.plot(dates, elos, marker='o', linestyle='-', label=player_name)
+
+    plt.title('ELO Rating History')
     plt.xlabel('Date')
     plt.ylabel('ELO Rating')
+    plt.legend()
     plt.grid(True)
     plt.show()
+
+plot_elo_history(['Iga Swiatek', 'Aryna Sabalenka', 'Jelena Ostapenko', 'Karolina Pliskova'])
 
 def get_elo_history_df(player_name: str) -> pd.DataFrame:
     player_id = player_name_to_id(player_name)
@@ -123,7 +129,6 @@ def get_elo_history_df(player_name: str) -> pd.DataFrame:
 
     return pd.DataFrame(data)
 
-
 def main(start_date: str, end_date: str):
     load_data(start_date, end_date)
 
@@ -135,14 +140,6 @@ if __name__ == "__main__":
     end_date = '2024-09-20'
     main(start_date, end_date)
 
-player1_id = player_name_to_id('Iga Swiatek')
-player2_id = player_name_to_id('Aryna Sabalenka')
-print(elo.predict_match_outcome(player1_id, player2_id))
-
-# Get ELO history DataFrame for Iga Swiatek
-# iga_swiatek_elo_df = get_elo_history_df('Iga Swiatek')
-# print(iga_swiatek_elo_df)
-# iga_swiatek_elo_df['Date'].to_list()
 def save_elo_model(filename: str):
     with open(filename, 'wb') as file:
         pickle.dump(elo, file)
@@ -152,7 +149,3 @@ def load_elo_model(filename: str) -> EloModel:
         return pickle.load(file)
 
 save_elo_model('elo_model.pkl')
-loaded_elo = load_elo_model('elo_model.pkl')
-print(loaded_elo.players)
-type(loaded_elo)
-loaded_elo.predict_match_outcome(player1_id, player2_id)
