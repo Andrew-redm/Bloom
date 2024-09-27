@@ -76,6 +76,7 @@ def load_data(start_date: str, end_date: str):
         datetime.strptime(start_date, '%Y-%m-%d'),
         datetime.strptime(end_date, '%Y-%m-%d')
     )
+    matches = matches.sort_values(by='Date_G')
     for _, match in matches.iterrows():
         winner_id = match['ID Winner_G']
         loser_id = match['ID Loser_G']
@@ -150,7 +151,6 @@ def load_elo_model(filename: str) -> EloModel:
     with open(filename, 'rb') as file:
         return pickle.load(file)
 
-# Example usage:
 save_elo_model('elo_model.pkl')
 loaded_elo = load_elo_model('elo_model.pkl')
 print(loaded_elo.players)
