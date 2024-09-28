@@ -2,10 +2,10 @@ import streamlit as st
 from datetime import datetime
 import pandas as pd
 import pickle
-from accessDB import get_upcoming_matches, player_name_to_id
+from accessDB import get_upcoming_matches, player_name_to_id, tournament_id_to_name
 from naiveElo import EloModel, Player, Match
 
-
+#lots of cheap performance improvements can be made here
 def load_elo_model(filename: str):
     with open(filename, 'rb') as file:
         return pickle.load(file)
@@ -25,25 +25,43 @@ def predict_outcomes(matches):
 
 def main():
     st.title("Today's Matches")
-
     matches = get_upcoming_matches()
+    matches['tournament'] = matches['Tour ID'].apply(tournament_id_to_name)
     if matches.empty:
         st.write("No matches found")
         return
 
-    predictions = predict_outcomes(matches)
+    st.sidebar.title("Filter Matches")
+    tournaments = matches['tournament'].unique()
+    selected_tournament = st.sidebar.selectbox("Tournaments", tournaments)
 
-    for i, (_, match) in enumerate(matches.iterrows()):
+    filtered_matches = matches[matches['tournament'] == selected_tournament]
+    filtered_predictions = predict_outcomes(filtered_matches)
+
+    if filtered_matches.empty:
+        st.write("No matches found for the selected tournament")
+        return
+
+    st.write(f"Matches for {selected_tournament}")
+    match_data = []
+    for i, (_, match) in enumerate(filtered_matches.iterrows()):
         player1_name = match['Player1']
         player2_name = match['Player2']
-        # odds_player1 = match['Odds_Player1']
-        # odds_player2 = match['Odds_Player2']
-        prediction = predictions[i]
+        prediction = filtered_predictions[i]
+        p1prob = round(prediction[player1_name],2)
+        p2prob = round(prediction[player2_name],2)
 
-        st.write(f"{player1_name} vs {player2_name}")
-        st.write(f"{player1_name} - {prediction[player1_name]:.2f}%, {player2_name} - {prediction[player2_name]:.2f}%")
-        st.write("---")
+        match_data.append({
+            "Player 1": player1_name,
+            "Player 2": player2_name,
+            "Player 1 Model Fair": f"{p1prob}",
+            "Player 1 Decimal": f"{round(1/p1prob,2)}",
+            "Player 2 Model Fair": f"{p2prob}",
+            "Player 2 Decimal": f"{round(1/p2prob,2)}"
+        })
+
+        match_df = pd.DataFrame(match_data)
+        st.table(match_df)
 
 if __name__ == "__main__":
     main()
-
