@@ -65,8 +65,8 @@ class EloModel:
         expected_score2 = self.calculate_expected_score(player2, player1)
 
         return {
-            player1.name: expected_score1 * 100,
-            player2.name: expected_score2 * 100
+            player1.name: expected_score1,
+            player2.name: expected_score2
         }
 
 elo = EloModel()
