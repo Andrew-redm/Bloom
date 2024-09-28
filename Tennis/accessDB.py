@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import csv
 
+
 db_path = os.environ.get('ONCOURT_DB_PATH')
 db_password = os.environ.get('ONCOURT_DB_PASSWORD')
 
@@ -129,24 +130,28 @@ def get_top_100():
     return top_100
 
 #this should really take a player pair and tournament id to return prices for one match only
-def get_player_match_odds(player_name):
-    query = f'''
-    SELECT odds_wta.*, players_wta.NAME_P
+def get_match_odds(P1ID, P2ID, tournament_id):
+    query = """
+    SELECT *
     FROM odds_wta
-    INNER JOIN players_wta ON (odds_wta.ID1_O = players_wta.ID_P OR odds_wta.ID2_O = players_wta.ID_P)
-    WHERE players_wta.NAME_P = '{player_name}'
-    '''
-    prices = pd.read_sql(query, conn)
-    prices = change_column_names(prices, replacements)
+    WHERE ID1_O = ? AND ID2_O = ? AND ID_T_O = ?
+    """
+    prices = pd.read_sql(query, conn, params=[P1ID, P2ID, tournament_id])
+    # prices = change_column_names(prices, replacements)
     return prices
 
-def get_todays_matches():
+def get_upcoming_matches(remove_doubles=True):
     query = '''
     SELECT *
     FROM today_wta
     WHERE today_wta.DATE_GAME >= NOW()
     '''
     today = pd.read_sql(query, conn)
+    today['Player1'] = today['ID1'].apply(player_id_to_name)
+    today['Player2'] = today['ID2'].apply(player_id_to_name)
+    today = change_column_names(today, replacements)
+    if remove_doubles:
+        today = today[~today['Player1'].str.contains('/') & ~today['Player2'].str.contains('/')]
     return today
 
 def get_player_match_result(player_name):

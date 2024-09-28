@@ -113,8 +113,6 @@ def plot_elo_history(player_names: List[str]):
     plt.grid(True)
     plt.show()
 
-plot_elo_history(['Iga Swiatek', 'Aryna Sabalenka', 'Jelena Ostapenko', 'Karolina Pliskova'])
-
 def get_elo_history_df(player_name: str) -> pd.DataFrame:
     player_id = player_name_to_id(player_name)
     player = elo.get_player(player_id)
@@ -147,5 +145,3 @@ def save_elo_model(filename: str):
 def load_elo_model(filename: str) -> EloModel:
     with open(filename, 'rb') as file:
         return pickle.load(file)
-
-save_elo_model('elo_model.pkl')
