@@ -71,8 +71,9 @@ class EloModel:
 
 elo = EloModel()
 
-def load_data(start_date: str, end_date: str):
+def load_data(tour, start_date: str, end_date: str):
     matches = get_matches_in_daterange(
+        tour,
         datetime.strptime(start_date, '%Y-%m-%d'),
         datetime.strptime(end_date, '%Y-%m-%d')
     )
@@ -91,11 +92,11 @@ def load_data(start_date: str, end_date: str):
         match = Match(winner=winner, loser=loser, date=match['Date_G'])
         elo.update_elo(match)
 
-def plot_elo_history(player_names: List[str]):
+def plot_elo_history(tour, player_names: List[str]):
     plt.figure(figsize=(10, 5))
 
     for player_name in player_names:
-        player_id = player_name_to_id(player_name)
+        player_id = player_name_to_id(tour, player_name)
         player = elo.get_player(player_id)
 
         if not player:
@@ -113,8 +114,8 @@ def plot_elo_history(player_names: List[str]):
     plt.grid(True)
     plt.show()
 
-def get_elo_history_df(player_name: str) -> pd.DataFrame:
-    player_id = player_name_to_id(player_name)
+def get_elo_history_df(tour, player_name: str) -> pd.DataFrame:
+    player_id = player_name_to_id(tour, player_name)
     player = elo.get_player(player_id)
 
     if not player:
@@ -127,16 +128,17 @@ def get_elo_history_df(player_name: str) -> pd.DataFrame:
 
     return pd.DataFrame(data)
 
-def main(start_date: str, end_date: str):
-    load_data(start_date, end_date)
+def main(tour: str, start_date: str, end_date: str):
+    load_data(tour, start_date, end_date)
 
     for player in elo.players.values():
         print(f"Player: {player.name}, ELO: {player.elo}")
 
 if __name__ == "__main__":
+    tour = 'atp'
     start_date = '2022-01-01'
-    end_date = '2024-09-20'
-    main(start_date, end_date)
+    end_date = '2022-01-04'
+    main(tour, start_date, end_date)
 
 def save_elo_model(filename: str):
     with open(filename, 'wb') as file:
