@@ -42,9 +42,9 @@ def player_id_to_name(tour, player_id):
 
 def player_name_to_id(tour, player_name):
     query = f'''
-    SELECT ID_P
-    FROM players_{tour}
-    WHERE NAME_P = '{player_name}'
+        SELECT ID_P
+        FROM players_{tour}
+        WHERE NAME_P = '{player_name.replace("'", "''")}'
     '''
     df = pd.read_sql(query, conn)
     return df['ID_P'][0] if not df.empty else None
@@ -134,7 +134,8 @@ def get_top_100():
     INNER JOIN players_wta ON ratings_wta.ID_P_R = players_wta.ID_P
     WHERE ratings_wta.POS_R < 101 AND ratings_wta.DATE_R = (SELECT MAX(DATE_R) FROM ratings_wta)
     ORDER BY ratings_wta.POS_R ASC'''
-    top_100 = change_column_names(pd.read_sql(top100WTA, conn), replacements)
+
+    top_100 = pd.read_sql(top100WTA, conn)
     return top_100
 
 def get_match_odds(tour, P1ID, P2ID, tournament_id):
