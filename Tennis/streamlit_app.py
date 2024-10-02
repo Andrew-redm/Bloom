@@ -10,33 +10,41 @@ def load_elo_model(filename: str):
     with open(filename, 'rb') as file:
         return pickle.load(file)
 
-elo = load_elo_model('elo_model.pkl')
-
-def predict_outcomes(matches):
+def predict_outcomes(matches, tour, elo):
     predictions = []
     for _, match in matches.iterrows():
         player1_name = match['Player1']
         player2_name = match['Player2']
-        player1_id = player_name_to_id(player1_name)
-        player2_id = player_name_to_id(player2_name)
+        player1_id = player_name_to_id(tour, player1_name)
+        player2_id = player_name_to_id(tour, player2_name)
         prediction = elo.predict_match_outcome(player1_id, player2_id)
         predictions.append(prediction)
     return predictions
 
 def main():
     st.title("Today's Matches")
-    matches = get_upcoming_matches()
-    matches['tournament'] = matches['Tour ID'].apply(tournament_id_to_name)
+    st.sidebar.title("Filter Matches")
+    selected_tour = st.sidebar.selectbox("Tour", ['atp', 'wta'])
+    matches = get_upcoming_matches(selected_tour)
+    matches['Tour'] = selected_tour.upper()
+    matches['tournament'] = matches['Tour ID'].apply(lambda x: tournament_id_to_name(tournament_id=x, tour=selected_tour))
     if matches.empty:
         st.write("No matches found")
         return
 
-    st.sidebar.title("Filter Matches")
     tournaments = matches['tournament'].unique()
-    selected_tournament = st.sidebar.selectbox("Tournaments", tournaments)
+    selected_tournament = st.sidebar.selectbox("Tournaments", tournaments, key="tournament_selectbox")
+
+    elo_models = {
+        'atp': load_elo_model('elo_model_atp.pkl'),
+        'wta': load_elo_model('elo_model_wta.pkl')
+    }
+
+    elo = elo_models[selected_tour]
+    matches = matches[matches['Tour'] == selected_tour.upper()]
 
     filtered_matches = matches[matches['tournament'] == selected_tournament]
-    filtered_predictions = predict_outcomes(filtered_matches)
+    filtered_predictions = predict_outcomes(filtered_matches, selected_tour, elo)
 
     if filtered_matches.empty:
         st.write("No matches found for the selected tournament")
@@ -48,20 +56,20 @@ def main():
         player1_name = match['Player1']
         player2_name = match['Player2']
         prediction = filtered_predictions[i]
-        p1prob = round(prediction[player1_name],2)
-        p2prob = round(prediction[player2_name],2)
+        p1prob = round(prediction[player1_name], 2)
+        p2prob = round(prediction[player2_name], 2)
 
         match_data.append({
             "Player 1": player1_name,
             "Player 2": player2_name,
-            "Player 1 Model Fair": f"{p1prob}",
-            "Player 1 Decimal": f"{round(1/p1prob,2)}",
-            "Player 2 Model Fair": f"{p2prob}",
-            "Player 2 Decimal": f"{round(1/p2prob,2)}"
+            "P1 Model Fair": f"{p1prob}",
+            "P1 Decimal": f"{round(1/p1prob, 2)}",
+            "P2 Model Fair": f"{p2prob}",
+            "P2 Decimal": f"{round(1/p2prob, 2)}"
         })
 
-        match_df = pd.DataFrame(match_data)
-        st.table(match_df)
+    match_df = pd.DataFrame(match_data)
+    st.table(match_df)
 
 if __name__ == "__main__":
     main()
