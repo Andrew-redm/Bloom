@@ -22,9 +22,9 @@ def predict_outcomes(matches, tour, elo):
     return predictions
 
 def main():
-    st.title("Today's Matches")
+    st.title("Upcoming Matches")
     st.sidebar.title("Filter Matches")
-    selected_tour = st.sidebar.selectbox("Tour", ['atp', 'wta'])
+    selected_tour = str.lower(st.sidebar.selectbox("Tour", ['ATP', 'WTA']))
     matches = get_upcoming_matches(selected_tour)
     matches['Tour'] = selected_tour.upper()
     matches['tournament'] = matches['Tour ID'].apply(lambda x: tournament_id_to_name(tournament_id=x, tour=selected_tour))

@@ -63,6 +63,19 @@ def change_column_names(df, replacements):
     df = df.rename(columns=replacements)
     return df
 
+def tournament_id_to_surface(tour, tournament_id):
+    query = f'''
+    SELECT ID_C_T
+    FROM tours_{tour}
+    WHERE ID_T = {tournament_id}
+    '''
+    surfacevalue = pd.read_sql(query, conn)
+    surfacevalue = int(surfacevalue['ID_C_T'][0])
+    surface = {1: 'hard', 2: 'clay', 3: 'indoor hard', 4:'carpet', 5: 'grass', 6: 'acrylic'}
+    return surface.get(surfacevalue, None)
+
+tournament_id_to_surface('wta', 430)
+
 def get_matches_in_daterange(tour, start_date, end_date=None, singlesOnly=True):
     if end_date is None:
         end_date = datetime.now() - timedelta(days=1)
@@ -75,10 +88,10 @@ def get_matches_in_daterange(tour, start_date, end_date=None, singlesOnly=True):
     matches = change_column_names(matches, replacements)
     matches['winnerName'] = matches['ID Winner_G'].apply(lambda player_id: player_id_to_name(tour, player_id))
     matches['loserName'] = matches['ID Loser_G'].apply(lambda player_id: player_id_to_name(tour, player_id))
+    matches['surface'] = matches['Tour ID_G'].apply(lambda x: tournament_id_to_surface(tour, x))
     if singlesOnly:
         matches = matches[~matches['winnerName'].str.contains('/') & ~matches['loserName'].str.contains('/')]
     return matches
-
 
 def get_tournaments_in_daterange(tour, start_date, end_date=None):
     """
@@ -188,3 +201,4 @@ def get_matches_in_tournament(tour, tournament_ids, singlesOnly=True):
     if singlesOnly:
         matches = matches[~matches['winnerName'].str.contains('/') & ~matches['loserName'].str.contains('/')]
     return matches
+

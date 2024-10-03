@@ -6,16 +6,35 @@ import pandas as pd
 import pickle
 import matplotlib.pyplot as plt
 
-
 class Player(BaseModel):
     id: int
     name: str
-    elo: float = 1500.0
-    elo_history: Dict[datetime, float] = {}
+    elo: Dict[str, float] = {
+        'overall': 1500.0,
+        'hard': 1500.0,
+        'clay': 1500.0,
+        'grass': 1500.0,
+        'indoor hard': 1500.0,
+        'carpet': 1500.0, #one of these last two is throwing an error so they both exist
+        'acrylic': 1500.0, 
+    }
+    elo_history: Dict[str, Dict[datetime, float]] = {
+        'overall': {},
+        'hard': {},
+        'clay': {},
+        'grass': {},
+        'indoor hard': {},
+        'carpet': {},
+        'acrylic': {},
+    }
 
     def update_elo(self, new_elo: float, date: datetime):
-        self.elo = new_elo
+        self.elo['overall'] = new_elo
         self.elo_history[date] = new_elo
+
+    def update_surface_elo(self, surface: str, new_elo: float, date: datetime):
+        self.elo[surface] = new_elo
+        self.elo_history[surface][date] = new_elo
 
 class Match(BaseModel):
     winner: Player
@@ -35,7 +54,7 @@ class EloModel:
         return self.players.get(player_id)
 
     def calculate_expected_score(self, player1: Player, player2: Player) -> float:
-        return 1 / (1 + 10 ** ((player2.elo - player1.elo) / 400))
+        return 1 / (1 + 10 ** ((player2.elo['overall'] - player1.elo['overall']) / 400))
 
     def update_elo(self, match: Match):
         winner = match.winner
@@ -44,11 +63,24 @@ class EloModel:
         expected_score_winner = self.calculate_expected_score(winner, loser)
         expected_score_loser = self.calculate_expected_score(loser, winner)
 
-        winner.elo += self.k_factor * (1 - expected_score_winner)
-        loser.elo += self.k_factor * (0 - expected_score_loser)
+        winner.elo['overall'] += self.k_factor * (1 - expected_score_winner)
+        loser.elo['overall'] += self.k_factor * (0 - expected_score_loser)
 
-        winner.update_elo(winner.elo, match.date)
-        loser.update_elo(loser.elo, match.date)
+        winner.update_elo(winner.elo['overall'], match.date)
+        loser.update_elo(loser.elo['overall'], match.date)
+        
+    def update_surface_elo(self, surface: str, match: Match):
+        winner = match.winner
+        loser = match.loser
+
+        expected_score_winner = self.calculate_expected_score(winner, loser)
+        expected_score_loser = self.calculate_expected_score(loser, winner)
+
+        winner.elo[surface] += self.k_factor * (1 - expected_score_winner)
+        loser.elo[surface] += self.k_factor * (0 - expected_score_loser)
+
+        winner.update_surface_elo(surface, winner.elo[surface], match.date)
+        loser.update_surface_elo(surface, loser.elo[surface], match.date)
 
     def process_matches(self, matches: List[Match]):
         for match in matches:
@@ -89,8 +121,10 @@ def load_data(tour, start_date: str, end_date: str):
     
         winner = elo.get_player(winner_id)
         loser = elo.get_player(loser_id)
-        match = Match(winner=winner, loser=loser, date=match['Date_G'])
-        elo.update_elo(match)
+        match_obj = Match(winner=winner, loser=loser, date=match['Date_G'])
+        elo.update_elo(match_obj)
+        elo.update_surface_elo(match['surface'], match_obj)
+
 
 def plot_elo_history(tour, player_names: List[str]):
     plt.figure(figsize=(10, 5))
@@ -132,12 +166,12 @@ def main(tour: str, start_date: str, end_date: str):
     load_data(tour, start_date, end_date)
 
     for player in elo.players.values():
-        print(f"Player: {player.name}, ELO: {player.elo}")
+        print(f"Player: {player.name}, ELO: {player.elo['overall']}")
 
 if __name__ == "__main__":
-    tour = 'atp'
+    tour = 'wta'
     start_date = '2022-01-01'
-    end_date = '2022-01-04'
+    end_date = '2024-09-30'
     main(tour, start_date, end_date)
 
 def save_elo_model(filename: str):
@@ -147,3 +181,5 @@ def save_elo_model(filename: str):
 def load_elo_model(filename: str) -> EloModel:
     with open(filename, 'rb') as file:
         return pickle.load(file)
+
+save_elo_model(f'elo_model_{tour}.pkl')
