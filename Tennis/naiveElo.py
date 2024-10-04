@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Dict, List
 from datetime import datetime
 from accessDB import get_matches_in_daterange, player_name_to_id
@@ -9,16 +9,16 @@ import matplotlib.pyplot as plt
 class Player(BaseModel):
     id: int
     name: str
-    elo: Dict[str, float] = {
+    elo: Dict[str, float] = Field(default_factory=lambda: {
         'overall': 1500.0,
         'hard': 1500.0,
         'clay': 1500.0,
         'grass': 1500.0,
         'indoor hard': 1500.0,
-        'carpet': 1500.0, #one of these last two is throwing an error so they both exist
-        'acrylic': 1500.0, 
-    }
-    elo_history: Dict[str, Dict[datetime, float]] = {
+        'carpet': 1500.0,
+        'acrylic': 1500.0,
+    })
+    elo_history: Dict[str, Dict[datetime, float]] = Field(default_factory=lambda: {
         'overall': {},
         'hard': {},
         'clay': {},
@@ -26,11 +26,11 @@ class Player(BaseModel):
         'indoor hard': {},
         'carpet': {},
         'acrylic': {},
-    }
+    })
 
     def update_elo(self, new_elo: float, date: datetime):
         self.elo['overall'] = new_elo
-        self.elo_history[date] = new_elo
+        self.elo_history['overall'][date] = new_elo
 
     def update_surface_elo(self, surface: str, new_elo: float, date: datetime):
         self.elo[surface] = new_elo
@@ -53,9 +53,9 @@ class EloModel:
     def get_player(self, player_id: int) -> Player:
         return self.players.get(player_id)
 
-    def calculate_expected_score(self, player1: Player, player2: Player) -> float:
-        return 1 / (1 + 10 ** ((player2.elo['overall'] - player1.elo['overall']) / 400))
-
+    def calculate_expected_score(self, player1: Player, player2: Player, surface: str = 'overall') -> float:
+        return 1 / (1 + 10 ** ((player2.elo[surface] - player1.elo[surface]) / 400))
+    
     def update_elo(self, match: Match):
         winner = match.winner
         loser = match.loser
@@ -72,13 +72,10 @@ class EloModel:
     def update_surface_elo(self, surface: str, match: Match):
         winner = match.winner
         loser = match.loser
-
-        expected_score_winner = self.calculate_expected_score(winner, loser)
-        expected_score_loser = self.calculate_expected_score(loser, winner)
-
+        expected_score_winner = self.calculate_expected_score(winner, loser, surface)
+        expected_score_loser = self.calculate_expected_score(loser, winner, surface)
         winner.elo[surface] += self.k_factor * (1 - expected_score_winner)
         loser.elo[surface] += self.k_factor * (0 - expected_score_loser)
-
         winner.update_surface_elo(surface, winner.elo[surface], match.date)
         loser.update_surface_elo(surface, loser.elo[surface], match.date)
 
@@ -126,18 +123,15 @@ def load_data(tour, start_date: str, end_date: str):
         elo.update_surface_elo(match['surface'], match_obj)
 
 
-def plot_elo_history(tour, player_names: List[str]):
-    plt.figure(figsize=(10, 5))
-
+def plot_elo_history(tour, player_names: List[str], elo_type: str = 'overall'):
     for player_name in player_names:
         player_id = player_name_to_id(tour, player_name)
         player = elo.get_player(player_id)
-
         if not player:
             raise ValueError(f"Player {player_name} not found in the ELO system.")
 
-        dates = list(player.elo_history.keys())
-        elos = list(player.elo_history.values())
+        dates = list(player.elo_history[elo_type].keys())
+        elos = list(player.elo_history[elo_type].values())
 
         plt.plot(dates, elos, marker='o', linestyle='-', label=player_name)
 
@@ -171,10 +165,11 @@ def main(tour: str, start_date: str, end_date: str):
 if __name__ == "__main__":
     tour = 'wta'
     start_date = '2022-01-01'
-    end_date = '2024-09-30'
+    end_date = '2024-10-02'
     main(tour, start_date, end_date)
 
 def save_elo_model(filename: str):
+
     with open(filename, 'wb') as file:
         pickle.dump(elo, file)
 
