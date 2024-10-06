@@ -173,6 +173,18 @@ def get_upcoming_matches(tour, remove_doubles=True):
     today = change_column_names(today, replacements)
     if remove_doubles:
         today = today[~today['Player1'].str.contains('/') & ~today['Player2'].str.contains('/')]
+    p1_odds = []
+    p2_odds = []
+    for _, match in today.iterrows():
+        odds = get_match_odds(tour, match['P1_ID'], match['P2_ID'], match['Tour ID'])
+        if not odds.empty:
+            p1_odds.append(odds['K1'].values[0])
+            p2_odds.append(odds['K2'].values[0])
+        else:
+            p1_odds.append(None)
+            p2_odds.append(None)
+    today['P1 Odds'] = p1_odds
+    today['P2 Odds'] = p2_odds
     return today
 
 def get_player_match_result(tour, player_name):
@@ -201,4 +213,3 @@ def get_matches_in_tournament(tour, tournament_ids, singlesOnly=True):
     if singlesOnly:
         matches = matches[~matches['winnerName'].str.contains('/') & ~matches['loserName'].str.contains('/')]
     return matches
-

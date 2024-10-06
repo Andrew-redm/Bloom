@@ -1,11 +1,9 @@
 import streamlit as st
-from datetime import datetime
 import pandas as pd
 import pickle
 from accessDB import get_upcoming_matches, player_name_to_id, tournament_id_to_name
 from naiveElo import EloModel, Player, Match
 
-#lots of cheap performance improvements can be made here
 def load_elo_model(filename: str):
     with open(filename, 'rb') as file:
         return pickle.load(file)
@@ -21,18 +19,28 @@ def predict_outcomes(matches, tour, elo):
         predictions.append(prediction)
     return predictions
 
+def format_player_name(player_name, model_value, market_price):
+    if model_value > market_price + 0.03:
+        return f'<b>{player_name}</b>'
+    else:
+        return player_name
+
 def main():
     st.title("Upcoming Matches")
     st.sidebar.title("Filter Matches")
     selected_tour = str.lower(st.sidebar.selectbox("Tour", ['ATP', 'WTA']))
-    matches = get_upcoming_matches(selected_tour)
-    matches['Tour'] = selected_tour.upper()
-    matches['tournament'] = matches['Tour ID'].apply(lambda x: tournament_id_to_name(tournament_id=x, tour=selected_tour))
-    if matches.empty:
+    atp_matches = get_upcoming_matches('atp')
+    wta_matches = get_upcoming_matches('wta')
+    atp_matches['Tour'] = 'ATP'
+    wta_matches['Tour'] = 'WTA'
+    all_matches = pd.concat([atp_matches, wta_matches], ignore_index=True)
+    all_matches['tournament'] = all_matches['Tour ID'].apply(lambda x: tournament_id_to_name(tournament_id=x, tour=selected_tour))
+
+    if all_matches.empty:
         st.write("No matches found")
         return
 
-    tournaments = matches['tournament'].unique()
+    tournaments = all_matches['tournament'].unique()
     selected_tournament = st.sidebar.selectbox("Tournaments", tournaments, key="tournament_selectbox")
 
     elo_models = {
@@ -41,9 +49,7 @@ def main():
     }
 
     elo = elo_models[selected_tour]
-    matches = matches[matches['Tour'] == selected_tour.upper()]
-
-    filtered_matches = matches[matches['tournament'] == selected_tournament]
+    filtered_matches = all_matches[(all_matches['Tour'] == selected_tour.upper()) & (all_matches['tournament'] == selected_tournament)]
     filtered_predictions = predict_outcomes(filtered_matches, selected_tour, elo)
 
     if filtered_matches.empty:
@@ -51,25 +57,27 @@ def main():
         return
 
     st.write(f"Matches for {selected_tournament}")
-    match_data = []
-    for i, (_, match) in enumerate(filtered_matches.iterrows()):
-        player1_name = match['Player1']
-        player2_name = match['Player2']
-        prediction = filtered_predictions[i]
-        p1prob = round(prediction[player1_name], 2)
-        p2prob = round(prediction[player2_name], 2)
 
-        match_data.append({
-            "Player 1": player1_name,
-            "Player 2": player2_name,
-            "P1 Model Fair": f"{p1prob}",
-            "P1 Decimal": f"{round(1/p1prob, 2)}",
-            "P2 Model Fair": f"{p2prob}",
-            "P2 Decimal": f"{round(1/p2prob, 2)}"
-        })
+    filtered_matches['P1 Market'] = 1 / filtered_matches['P1 Odds']
+    filtered_matches['P2 Market'] = 1 / filtered_matches['P2 Odds']
+
+    match_data = [
+        {
+            "Player 1": match['Player1'],
+            "P1 Model Fair": round(filtered_predictions[i][match['Player1']], 2),
+            'P1 Market': match['P1 Market'],
+            "Player 2": match['Player2'],
+            "P2 Model Fair": round(filtered_predictions[i][match['Player2']], 2),
+            "P2 Market": match['P2 Market'],
+        }
+        for i, (_, match) in enumerate(filtered_matches.iterrows())
+    ]
 
     match_df = pd.DataFrame(match_data)
-    st.table(match_df)
+    match_df['Player 1'] = match_df.apply(lambda row: format_player_name(row['Player 1'], row['P1 Model Fair'], row['P1 Market']), axis=1)
+    match_df['Player 2'] = match_df.apply(lambda row: format_player_name(row['Player 2'], row['P2 Model Fair'], row['P2 Market']), axis=1)
+    match_df_html = match_df.to_html(escape=False, index=False)
+    st.markdown(match_df_html, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()

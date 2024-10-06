@@ -163,8 +163,8 @@ def main(tour: str, start_date: str, end_date: str):
         print(f"Player: {player.name}, ELO: {player.elo['overall']}")
 
 if __name__ == "__main__":
-    tour = 'wta'
-    start_date = '2022-01-01'
+    tour = 'atp'
+    start_date = '2021-01-01'
     end_date = '2024-10-02'
     main(tour, start_date, end_date)
 
@@ -176,5 +176,3 @@ def save_elo_model(filename: str):
 def load_elo_model(filename: str) -> EloModel:
     with open(filename, 'rb') as file:
         return pickle.load(file)
-
-save_elo_model(f'elo_model_{tour}.pkl')
