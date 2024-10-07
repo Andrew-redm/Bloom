@@ -1,97 +1,163 @@
+from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, DateTime, Float, select, and_, alias
+from sqlalchemy.exc import SQLAlchemyError
 import os
-import pyodbc
-import pandas as pd
+from urllib.parse import quote_plus
 from datetime import datetime, timedelta
-import csv
+import pandas as pd
 
 db_path = os.environ.get('ONCOURT_DB_PATH')
 db_password = os.environ.get('ONCOURT_DB_PASSWORD')
 
-if not db_path or not db_password:
-    raise ValueError("ONCOURT_DB_PATH or ONCOURT_DB_PASSWORD environment variable not set")
+encoded_password = quote_plus(db_password)
 
-conn_str = r"DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=" + db_path + ";PWD=" + db_password
+conn_str = f"access+pyodbc:///?odbc_connect=DRIVER={{Microsoft Access Driver (*.mdb, *.accdb)}};DBQ={db_path};PWD={encoded_password}"
+
+print(f"Connection String: {conn_str}")
+
+engine = create_engine(conn_str)
+metadata = MetaData()
+
+#what a mess
+games_atp = Table('games_atp', metadata,
+    Column('ID1_G', Integer),
+    Column('ID2_G', Integer),
+    Column('ID_T_G', Integer),
+    Column('ID_R_G', Integer),
+    Column('RESULT_G', String),
+    Column('DATE_G', DateTime),
+)
+
+players_atp = Table('players_atp', metadata,
+    Column('ID_P', Integer, primary_key=True),
+    Column('NAME_P', String),
+    Column('DATE_P', DateTime),
+    Column('COUNTRY_P', String),
+    Column('RANK_P', Integer),
+    Column('PROGRESS_P', Integer),
+    Column('POINT_P', Integer),
+    Column('HARDPOINT_P', Integer),
+    Column('HARDTOUR_P', Integer),
+    Column('CLAYPOINT_P', Integer),
+    Column('CLAYTOUR_P', Integer),
+    Column('GRASSPOINT_P', Integer),
+    Column('GRASSTOUR_P', Integer),
+    Column('CARPETPOINT_P', Integer),
+    Column('CARPETTOUR_P', Integer),
+    Column('PRIZE_P', Float),
+    Column('CH_P', Integer),
+    Column('DR_P', Integer),
+    Column('DP_P', Integer),
+    Column('DO_P', Integer),
+    Column('IHARDPOINT_P', Integer),
+    Column('IHARDTOUR_P', Integer),
+    Column('ITF_ID', String),
+)
+
+tours_atp = Table('tours_atp', metadata,
+    Column('ID_T', Integer, primary_key=True),
+    Column('NAME_T', String),
+    Column('ID_C_T', Integer),
+    Column('DATE_T', DateTime),
+    Column('RANK_T', Integer),
+    Column('LINK_T', String),
+    Column('COUNTRY_T', String),
+    Column('PRIZE_T', Float),
+    Column('RATING_T', Integer),
+    Column('URL_T', String),
+    Column('LATITUDE_T', Float),
+    Column('LONGITUDE_T', Float),
+    Column('SITE_T', String),
+    Column('RACE_T', String),
+    Column('ENTRY_T', String),
+    Column('SINGLES_T', Integer),
+    Column('DOUBLES_T', Integer),
+    Column('TIER_T', String),
+    Column('RESERVE_INT_T', Integer),
+    Column('RESERVE_CHAR_T', String),
+    Column('LIVE_T', Integer),
+    Column('RESULT_T', String),
+)
 
 try:
-    conn = pyodbc.connect(conn_str)
-    cursor = conn.cursor()
-    
-except pyodbc.Error as e:
-    print("Error connecting to the database:", e)
+    with engine.connect() as connection:
+        query = select(
+            games_atp.c.ID1_G,
+            games_atp.c.ID2_G,
+            games_atp.c.RESULT_G,
+            games_atp.c.DATE_G,
+            players_atp.c.NAME_P.label('Player1_Name'),
+            players_atp.c.COUNTRY_P.label('Player1_Country'),
+            tours_atp.c.NAME_T.label('Tournament_Name'),
+            tours_atp.c.COUNTRY_T.label('Tournament_Country')
+        ).select_from(
+            games_atp.join(players_atp, games_atp.c.ID1_G == players_atp.c.ID_P)
+                     .join(tours_atp, games_atp.c.ID_T_G == tours_atp.c.ID_T)
+        ).limit(10)  
+        result = connection.execute(query)
+        for row in result:
+            print(row)
+    print("Success")
+except SQLAlchemyError as e:
+    print(f"Holy moses: {e}")
 
-def load_replacements(file_path):
-    replacements = {}
-    with open(file_path, mode='r') as infile:
-        reader = csv.reader(infile)
-        for rows in reader:
-            key = rows[0]
-            value = rows[1]
-            replacements[key] = value
-    return replacements
+def get_player_id(tour, player_name):
+    try:
+        players_table = Table(f'players_{tour}', metadata, autoload_with=engine)
+        query = select(players_table.c.ID_P).where(players_table.c.NAME_P == player_name)
+        
+        with engine.connect() as connection:
+            result = connection.execute(query)
+            player_id = result.scalar()
+            return player_id
+    except SQLAlchemyError as e:
+        print(f"An error occurred: {e}")
+        return None
 
-replacements = load_replacements('replacements.csv')
-
-def player_id_to_name(tour, player_id):
-    query = f'''
-    SELECT NAME_P
-    FROM players_{tour}
-    WHERE ID_P = {player_id}
-    '''
-    df = pd.read_sql(query, conn)
-    return df['NAME_P'][0] if not df.empty else None
-
-def player_name_to_id(tour, player_name):
-    query = f'''
-        SELECT ID_P
-        FROM players_{tour}
-        WHERE NAME_P = '{player_name.replace("'", "''")}'
-    '''
-    df = pd.read_sql(query, conn)
-    return df['ID_P'][0] if not df.empty else None
-
-def tournament_id_to_name(tour, tournament_id):
-    #this is gross. tour means WTA/ATP but in db it means tournament
-    query = f'''
-    SELECT NAME_T
-    FROM tours_{tour}
-    WHERE ID_T = {tournament_id}
-    '''
-    tourneyName = pd.read_sql(query, conn)
-    return tourneyName['NAME_T'][0] if not tourneyName.empty else None
-
-def change_column_names(df, replacements):
-    df = df.rename(columns=replacements)
-    return df
-
-def tournament_id_to_surface(tour, tournament_id):
-    query = f'''
-    SELECT ID_C_T
-    FROM tours_{tour}
-    WHERE ID_T = {tournament_id}
-    '''
-    surfacevalue = pd.read_sql(query, conn)
-    surfacevalue = int(surfacevalue['ID_C_T'][0])
-    surface = {1: 'hard', 2: 'clay', 3: 'indoor hard', 4:'carpet', 5: 'grass', 6: 'acrylic'}
-    return surface.get(surfacevalue, None)
-
-tournament_id_to_surface('wta', 430)
-
-def get_matches_in_daterange(tour, start_date, end_date=None, singlesOnly=True):
+def get_matches_in_daterange(tour, start_date, end_date=None, singles_only=True):
     if end_date is None:
         end_date = datetime.now() - timedelta(days=1)
-    query = f'''
-    SELECT *
-    FROM games_{tour}
-    WHERE DATE_G BETWEEN #{start_date}# AND #{end_date.strftime('%Y-%m-%d')}#
-    '''
-    matches = pd.read_sql(query, conn)
-    matches = change_column_names(matches, replacements)
-    matches['winnerName'] = matches['ID Winner_G'].apply(lambda player_id: player_id_to_name(tour, player_id))
-    matches['loserName'] = matches['ID Loser_G'].apply(lambda player_id: player_id_to_name(tour, player_id))
-    matches['surface'] = matches['Tour ID_G'].apply(lambda x: tournament_id_to_surface(tour, x))
-    if singlesOnly:
-        matches = matches[~matches['winnerName'].str.contains('/') & ~matches['loserName'].str.contains('/')]
-    return matches
+    
+    start_date_str = start_date.strftime('%Y-%m-%d')
+    end_date_str = end_date.strftime('%Y-%m-%d')
+
+    try:
+        games_table = Table(f'games_{tour}', metadata, autoload_with=engine)
+        players_table = Table(f'players_{tour}', metadata, autoload_with=engine)
+        tours_table = Table(f'tours_{tour}', metadata, autoload_with=engine)
+
+        player1 = alias(players_table, name='player1')
+        player2 = alias(players_table, name='player2')
+
+        query = select(
+            games_table.c.ID1_G,
+            games_table.c.DATE_G,
+            player1.c.NAME_P.label('player1_name'),
+            player2.c.NAME_P.label('player2_name'),
+            tours_table.c.NAME_T.label('tournament_name')
+        ).select_from(
+            games_table.join(player1, games_table.c.ID1_G == player1.c.ID_P)
+                       .join(player2, games_table.c.ID2_G == player2.c.ID_P)
+                       .join(tours_table, games_table.c.ID_T_G == tours_table.c.ID_T)
+        ).where(
+            and_(
+                games_table.c.DATE_G >= start_date_str,
+                games_table.c.DATE_G <= end_date_str
+            )
+        )
+
+        if singles_only:
+            query = query.where(games_table.c.ID_R_G == 1)  # Assuming 1 indicates singles matches
+
+        with engine.connect() as connection:
+            result = connection.execute(query)
+            matches = pd.DataFrame(result.fetchall(), columns=result.keys())
+            return matches
+    except SQLAlchemyError as e:
+        print(f"An error occurred: {e}")
+        return None
+
+matches = get_matches_in_daterange('atp', datetime(2021, 1, 1), datetime(2021, 1, 31))
+print(matches)
 
 def get_tournaments_in_daterange(tour, start_date, end_date=None):
     """
