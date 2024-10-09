@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Dict, List
 from datetime import datetime
-from accessDB import get_matches_in_daterange, player_name_to_id
+from accessDB import get_matches_in_daterange
 import pandas as pd
 import pickle
 import matplotlib.pyplot as plt
@@ -122,39 +122,40 @@ def load_data(tour, start_date: str, end_date: str):
         elo.update_elo(match_obj)
         elo.update_surface_elo(match['surface'], match_obj)
 
+#refactor some other time
+# def plot_elo_history(tour, player_names: List[str], elo_type: str = 'overall'):
+#     for player_name in player_names:
+#         player_id = player_name_to_id(tour, player_name)
+#         player = elo.get_player(player_id)
+#         if not player:
+#             raise ValueError(f"Player {player_name} not found in the ELO system.")
 
-def plot_elo_history(tour, player_names: List[str], elo_type: str = 'overall'):
-    for player_name in player_names:
-        player_id = player_name_to_id(tour, player_name)
-        player = elo.get_player(player_id)
-        if not player:
-            raise ValueError(f"Player {player_name} not found in the ELO system.")
+#         dates = list(player.elo_history[elo_type].keys())
+#         elos = list(player.elo_history[elo_type].values())
 
-        dates = list(player.elo_history[elo_type].keys())
-        elos = list(player.elo_history[elo_type].values())
+#         plt.plot(dates, elos, marker='o', linestyle='-', label=player_name)
 
-        plt.plot(dates, elos, marker='o', linestyle='-', label=player_name)
+#     plt.title('ELO Rating History')
+#     plt.xlabel('Date')
+#     plt.ylabel('ELO Rating')
+#     plt.legend()
+#     plt.grid(True)
+#     plt.show()
 
-    plt.title('ELO Rating History')
-    plt.xlabel('Date')
-    plt.ylabel('ELO Rating')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+#refactor some other time
+# def get_elo_history_df(tour, player_name: str) -> pd.DataFrame:
+#     player_id = player_name_to_id(tour, player_name)
+#     player = elo.get_player(player_id)
 
-def get_elo_history_df(tour, player_name: str) -> pd.DataFrame:
-    player_id = player_name_to_id(tour, player_name)
-    player = elo.get_player(player_id)
+#     if not player:
+#         raise ValueError(f"Player {player_name} not found in the ELO system.")
 
-    if not player:
-        raise ValueError(f"Player {player_name} not found in the ELO system.")
+#     data = {
+#         'Date': list(player.elo_history.keys()),
+#         'ELO': list(player.elo_history.values())
+#     }
 
-    data = {
-        'Date': list(player.elo_history.keys()),
-        'ELO': list(player.elo_history.values())
-    }
-
-    return pd.DataFrame(data)
+#     return pd.DataFrame(data)
 
 def main(tour: str, start_date: str, end_date: str):
     load_data(tour, start_date, end_date)
