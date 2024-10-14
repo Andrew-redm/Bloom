@@ -12,8 +12,12 @@ elo_models = {
     'atp': load_elo_model('elo_model_atp.pkl'),
     'wta': load_elo_model('elo_model_wta.pkl')
 }
+
 def calculate_expected_score(p1, p2) -> float:
-        return 1 / (1 + 10 ** ((p2 - p1) / 400))
+    if p1 is None or p2 is None:
+        return None
+    return 1 / (1 + 10 ** ((p2 - p1) / 400))
+
 
 def get_player_elo(player_id, tour, surface='overall'):
     elo = elo_models[tour]

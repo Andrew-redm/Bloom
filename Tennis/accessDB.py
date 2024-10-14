@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, select, and_, alias, or_, Table, MetaData
+from sqlalchemy import create_engine, select, and_, alias, or_, Table, MetaData, not_
 from sqlalchemy.exc import SQLAlchemyError
 import os
 from urllib.parse import quote_plus
@@ -55,7 +55,8 @@ def get_matches_in_daterange(tour, start_date, end_date=None, singles_only=True)
             games_table.c.DATE_G,
             player1.c.NAME_P.label('player1_name'),
             player2.c.NAME_P.label('player2_name'),
-            tours_table.c.NAME_T.label('tournament_name')
+            tours_table.c.NAME_T.label('tournament_name'),
+            tours_table.c.ID_C_T.label('surface')
         ).select_from(
             games_table.join(player1, games_table.c.ID1_G == player1.c.ID_P)
                        .join(player2, games_table.c.ID2_G == player2.c.ID_P)
@@ -66,18 +67,20 @@ def get_matches_in_daterange(tour, start_date, end_date=None, singles_only=True)
                 games_table.c.DATE_G <= end_date_str
             )
         )
-
         if singles_only:
-            query = query.where(games_table.c.ID_R_G == 1) 
+            query = query.where(
+            not_(player1.c.NAME_P.like('%/%'))
+            )
 
         with engine.connect() as connection:
             result = connection.execute(query)
             matches = pd.DataFrame(result.fetchall(), columns=result.keys())
+            matches['surface'] = matches['surface'].map({1: 'hard', 2: 'clay', 3: 'indoor hard', 4: 'carpet', 5: 'grass', 6: 'acrylic'})
+        
             return matches
     except SQLAlchemyError as e:
         print(f"An error occurred: {e}")
         return None
-    
 
 def get_tournaments_in_daterange(tour, start_date, end_date=None):
     """
@@ -213,3 +216,4 @@ def get_upcoming_matches(tour, remove_doubles=True):
     except SQLAlchemyError as e:
         print(f"An error occurred: {e}")
         return None
+    

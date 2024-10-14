@@ -106,21 +106,23 @@ def load_data(tour, start_date: str, end_date: str):
         datetime.strptime(start_date, '%Y-%m-%d'),
         datetime.strptime(end_date, '%Y-%m-%d')
     )
-    matches = matches.sort_values(by='Date_G')
+    matches = pd.DataFrame(matches).sort_values(by='DATE_G')
     for _, match in matches.iterrows():
-        winner_id = match['ID Winner_G']
-        loser_id = match['ID Loser_G']
-        winner_name = match['winnerName']
-        loser_name = match['loserName']
+        winner_id = match['ID1_G']
+        loser_id = match['ID2_G']
+        winner_name = match['player1_name']
+        loser_name = match['player2_name']
 
         elo.add_player(winner_id, winner_name)
         elo.add_player(loser_id, loser_name)
     
         winner = elo.get_player(winner_id)
         loser = elo.get_player(loser_id)
-        match_obj = Match(winner=winner, loser=loser, date=match['Date_G'])
+        match_obj = Match(winner=winner, loser=loser, date=match['DATE_G'])
         elo.update_elo(match_obj)
         elo.update_surface_elo(match['surface'], match_obj)
+
+    return matches
 
 #refactor some other time
 # def plot_elo_history(tour, player_names: List[str], elo_type: str = 'overall'):
@@ -164,9 +166,9 @@ def main(tour: str, start_date: str, end_date: str):
         print(f"Player: {player.name}, ELO: {player.elo['overall']}")
 
 if __name__ == "__main__":
-    tour = 'atp'
+    tour = 'wta'
     start_date = '2021-01-01'
-    end_date = '2024-10-02'
+    end_date = '2024-10-13'
     main(tour, start_date, end_date)
 
 def save_elo_model(filename: str):
