@@ -10,7 +10,7 @@ The annoying this is that the problem says it can be solved by pen and paper. i 
 from tqdm import tqdm
 from math import ceil, sqrt
 
-with open('primes.txt', 'r') as file:
+with open('remainders.txt', 'r') as file:
     lines = [int(line.strip()) for line in file.readlines()]
 
 def is_prime(n):
