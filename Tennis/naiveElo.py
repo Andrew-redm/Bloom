@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Dict, List
 from datetime import datetime
-from accessDB import get_matches_in_daterange
+from accessDB import get_matches_in_daterange, get_player_id
 import pandas as pd
 import pickle
 import matplotlib.pyplot as plt
@@ -9,15 +9,7 @@ import matplotlib.pyplot as plt
 class Player(BaseModel):
     id: int
     name: str
-    elo: Dict[str, float] = Field(default_factory=lambda: {
-        'overall': 1500.0,
-        'hard': 1500.0,
-        'clay': 1500.0,
-        'grass': 1500.0,
-        'indoor hard': 1500.0,
-        'carpet': 1500.0,
-        'acrylic': 1500.0,
-    })
+    elo: Dict[str, float] = Field(default_factory=dict)
     elo_history: Dict[str, Dict[datetime, float]] = Field(default_factory=lambda: {
         'overall': {},
         'hard': {},
@@ -27,6 +19,27 @@ class Player(BaseModel):
         'carpet': {},
         'acrylic': {},
     })
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.set_initial_elo(data.get('tournament_rank', 5)) #default to 1500
+
+    def set_initial_elo(self, tournament_rank: int):
+        initial_elo = 1500.0  # Default ELO
+        if tournament_rank in [0, 1]:
+            initial_elo = 1420.0
+        elif tournament_rank in [6]:
+            initial_elo = 1340.0
+        # Apply the initial ELO across all surfaces
+        self.elo = {
+            'overall': initial_elo,
+            'hard': initial_elo,
+            'clay': initial_elo,
+            'grass': initial_elo,
+            'indoor hard': initial_elo,
+            'carpet': initial_elo,
+            'acrylic': initial_elo,
+        }
 
     def update_elo(self, new_elo: float, date: datetime):
         self.elo['overall'] = new_elo
@@ -144,6 +157,28 @@ def load_data(tour, start_date: str, end_date: str):
 #     plt.grid(True)
 #     plt.show()
 
+def plot_elo_history(tour, player_names: List[str], elo_type: str = 'overall'):
+    for player_name in player_names:
+        player_id = get_player_id(tour, player_name)
+        player = elo.get_player(player_id)
+        if not player:
+            raise ValueError(f"Player {player_name} not found in the ELO system.")
+
+        dates = list(player.elo_history[elo_type].keys())
+        elos = list(player.elo_history[elo_type].values())
+
+        plt.plot(dates, elos, marker='o', linestyle='-', label=player_name)
+
+    plt.title('ELO Rating History')
+    plt.xlabel('Date')
+    plt.ylabel('ELO Rating')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+# Example usage
+
+
 #refactor some other time
 # def get_elo_history_df(tour, player_name: str) -> pd.DataFrame:
 #     player_id = player_name_to_id(tour, player_name)
@@ -165,12 +200,6 @@ def main(tour: str, start_date: str, end_date: str):
     for player in elo.players.values():
         print(f"Player: {player.name}, ELO: {player.elo['overall']}")
 
-if __name__ == "__main__":
-    tour = 'wta'
-    start_date = '2021-01-01'
-    end_date = '2024-10-13'
-    main(tour, start_date, end_date)
-
 def save_elo_model(filename: str):
 
     with open(filename, 'wb') as file:
@@ -179,3 +208,11 @@ def save_elo_model(filename: str):
 def load_elo_model(filename: str) -> EloModel:
     with open(filename, 'rb') as file:
         return pickle.load(file)
+    
+if __name__ == "__main__":
+    tour = 'wta'
+    start_date = '2021-01-01'
+    end_date = '2024-10-16'
+    main(tour, start_date, end_date)
+    save_elo_model(f'elo_model_{tour}.pkl')
+

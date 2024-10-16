@@ -56,7 +56,8 @@ def get_matches_in_daterange(tour, start_date, end_date=None, singles_only=True)
             player1.c.NAME_P.label('player1_name'),
             player2.c.NAME_P.label('player2_name'),
             tours_table.c.NAME_T.label('tournament_name'),
-            tours_table.c.ID_C_T.label('surface')
+            tours_table.c.ID_C_T.label('surface'),
+            tours_table.c.RANK_T.label('tournament_rank')
         ).select_from(
             games_table.join(player1, games_table.c.ID1_G == player1.c.ID_P)
                        .join(player2, games_table.c.ID2_G == player2.c.ID_P)
@@ -69,7 +70,7 @@ def get_matches_in_daterange(tour, start_date, end_date=None, singles_only=True)
         )
         if singles_only:
             query = query.where(
-            not_(player1.c.NAME_P.like('%/%'))
+                not_(player1.c.NAME_P.like('%/%'))
             )
 
         with engine.connect() as connection:
